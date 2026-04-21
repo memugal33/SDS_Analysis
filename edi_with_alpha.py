@@ -108,9 +108,29 @@ CLOUD_ENDMEMBER = [
              #             cloud from dust (dust has SWIR > Blue, cloud has both high)
 ]
 
-# Collect into the list format expected by ee.Image.unmix()
-# Order matters: output band 0 = dust, band 1 = soil, band 2 = cloud
-ENDMEMBER_MATRIX = [DUST_ENDMEMBER, BARE_SOIL_ENDMEMBER, CLOUD_ENDMEMBER]
+# Water endmember — added as 4th endmember so alpha_water is available for the
+# WB (Water Bodies) threshold in apply_multi_index_thresholds.py.
+# Water strongly absorbs NIR and SWIR, giving near-zero values in B2–B7.
+# B4 (Green) is slightly elevated due to backscatter from optically deep water.
+WATER_ENDMEMBER = [
+    0.04,   # B1 Red    — water: very low red reflectance
+    0.02,   # B2 NIR    — water: strong NIR absorption
+    0.06,   # B3 Blue   — water: slightly higher blue (backscatter)
+    0.05,   # B4 Green  — water: slight green peak for clear water
+    0.01,   # B5 SWIR-1 — water: near-zero SWIR (absorbed)
+    0.01,   # B6 SWIR-2
+    0.01,   # B7 SWIR-3 — water: essentially zero beyond 1μm
+]
+
+# Endmember matrix — order determines output band indices:
+#   band 0 = alpha_dust, band 1 = alpha_soil,
+#   band 2 = alpha_cloud, band 3 = alpha_water
+ENDMEMBER_MATRIX = [
+    DUST_ENDMEMBER,
+    BARE_SOIL_ENDMEMBER,
+    CLOUD_ENDMEMBER,
+    WATER_ENDMEMBER,
+]
 
 
 # ==============================================================================
@@ -173,14 +193,19 @@ def compute_dust_fraction(image):
         nonNegative=True
     )
 
-    # Rename output bands to match their endmember identity
-    # band_0 = dust fraction, band_1 = soil fraction, band_2 = cloud fraction
-    alpha_bands = unmixed.rename(['alpha_dust', 'alpha_soil', 'alpha_cloud'])
+    # Rename output bands to match their endmember identity.
+    # band_0 = dust, band_1 = soil, band_2 = cloud, band_3 = water
+    alpha_bands = unmixed.rename(
+        ['alpha_dust', 'alpha_soil', 'alpha_cloud', 'alpha_water']
+    )
 
-    # Attach only the dust fraction (α) to the input image.
-    # The soil/cloud fractions are intermediate products; they could be retained
-    # for QC by replacing select('alpha_dust') with alpha_bands.
-    return image.addBands(alpha_bands.select('alpha_dust'))
+    # Attach dust, cloud, and water fractions to the image.
+    # alpha_cloud and alpha_water are required by apply_multi_index_thresholds
+    # for the TnC and WB class criteria respectively.
+    # alpha_soil is an intermediate product and is not added to keep bands lean.
+    return image.addBands(
+        alpha_bands.select(['alpha_dust', 'alpha_cloud', 'alpha_water'])
+    )
 
 
 # ==============================================================================
