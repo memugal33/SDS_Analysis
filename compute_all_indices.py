@@ -157,7 +157,6 @@ def compute_all_indices(image):
     # MBSCI — Modified Bare Soil / Cloud Index   [Wang et al. 2022]
     #   (B4 + B1) / (B6 + B7)   uses (Green + Red) / (SWIR-2 + SWIR-3)
     #
-    # IMPORTANT: denominator is B6+B7 (not 2·B3·B6 — earlier formulation error).
     #
     # Clouds and snow: very bright in visible (B1, B4), weak in SWIR → high MBSCI.
     # Dust: moderate visible + moderate SWIR → lower MBSCI than cloud.

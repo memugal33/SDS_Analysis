@@ -101,87 +101,87 @@ CLASS_LEGEND = {
     '11 — Snow and Ice':      '#e0f3f8',
 }
 
-# ==============================================================================
-# AUXILIARY DATASETS — loaded once at module import
-# ==============================================================================
+# # ==============================================================================
+# # AUXILIARY DATASETS — loaded once at module import
+# # ==============================================================================
 
-# SRTM DEM: required for SI class (elevation > 2500 m).
-# Dubai max elevation ≈ 300 m — SI pixels will not occur unless ROI is expanded
-# to include the Hajar Mountains (Oman/UAE, up to ~3000 m).
-srtm_band = (
-    ee.Image('USGS/SRTMGL1_003')
-    .select('elevation')
-    .reproject(crs='EPSG:4326', scale=500)
-    # .clip(roi)
-    .rename('DEM')
-)
+# # SRTM DEM: required for SI class (elevation > 2500 m).
+# # Dubai max elevation ≈ 300 m — SI pixels will not occur unless ROI is expanded
+# # to include the Hajar Mountains (Oman/UAE, up to ~3000 m).
+# srtm_band = (
+#     ee.Image('USGS/SRTMGL1_003')
+#     .select('elevation')
+#     .reproject(crs='EPSG:4326', scale=500)
+#     # .clip(roi)
+#     .rename('DEM')
+# )
 
-# MCD12Q1 land cover — IGBP Type 1. Water body = class 17.
-# Year 2020 used as default; adjust if analysing a different year.
-# Used for WD class (dust over water bodies).
-lct_band = (
-    ee.ImageCollection('MODIS/061/MCD12Q1')
-    .filter(ee.Filter.calendarRange(2020, 2020, 'year'))
-    .first()
-    .select('LC_Type1')
-    .reproject(crs='EPSG:4326', scale=500)
-    # .clip(roi)
-    .rename('LCT')
-)
+# # MCD12Q1 land cover — IGBP Type 1. Water body = class 17.
+# # Year 2020 used as default; adjust if analysing a different year.
+# # Used for WD class (dust over water bodies).
+# lct_band = (
+#     ee.ImageCollection('MODIS/061/MCD12Q1')
+#     .filter(ee.Filter.calendarRange(2020, 2020, 'year'))
+#     .first()
+#     .select('LC_Type1')
+#     .reproject(crs='EPSG:4326', scale=500)
+#     # .clip(roi)
+#     .rename('LCT')
+# )
 
 IGBP_WATER = 17   # IGBP water body class code
 
 
-# ==============================================================================
-# FUNCTION 1 — ATTACH AUXILIARY DATA
-# ==============================================================================
+# # ==============================================================================
+# # FUNCTION 1 — ATTACH AUXILIARY DATA
+# # ==============================================================================
 
-def attach_auxiliary_data(image, lct_year=2020):
-    """
-    Attach SRTM DEM and MCD12Q1 land cover type as bands to the image.
+# def attach_auxiliary_data(image, lct_year=2020):
+#     """
+#     Attach SRTM DEM and MCD12Q1 land cover type as bands to the image.
 
-    Both datasets are reprojected to match the MOD09GA 500 m pixel grid.
-    DEM uses bilinear resampling (continuous elevation values).
-    LCT uses nearest-neighbour (preserves integer class codes).
+#     Both datasets are reprojected to match the MOD09GA 500 m pixel grid.
+#     DEM uses bilinear resampling (continuous elevation values).
+#     LCT uses nearest-neighbour (preserves integer class codes).
 
-    These auxiliary bands are required by three Table 3 criteria:
-        SI  → DEM > 2500 m   (separates high-altitude snow from thick cloud)
-        WD  → LCT == 17      (dust over IGBP water body land cover)
+#     These auxiliary bands are required by three Table 3 criteria:
+#         SI  → DEM > 2500 m   (separates high-altitude snow from thick cloud)
+#         WD  → LCT == 17      (dust over IGBP water body land cover)
 
-    Parameters
-    ----------
-    image : ee.Image
-        Image with reflectance and index bands already attached.
-    lct_year : int
-        Year of MCD12Q1 land cover to use. Defaults to 2020.
+#     Parameters
+#     ----------
+#     image : ee.Image
+#         Image with reflectance and index bands already attached.
+#     lct_year : int
+#         Year of MCD12Q1 land cover to use. Defaults to 2020.
 
-    Returns
-    -------
-    ee.Image
-        Input image with 'DEM' and 'LCT' bands added.
-    """
+#     Returns
+#     -------
+#     ee.Image
+#         Input image with 'DEM' and 'LCT' bands added.
+#     """
 
-# DEM — reproject only, no .resample() call needed
-    dem_500m = (
-        srtm_band
-        .reproject(crs=image.projection(), scale=500)
-        .rename('DEM')
-    )
+# # DEM — reproject only, no .resample() call needed
+#     dem_500m = (
+#         srtm_band
+#         .reproject(crs=image.projection(), scale=500)
+#         .rename('DEM')
+#     )
 
-    # LCT — reproject only, GEE uses nearest neighbour by default
-    # for integer/categorical images when no resample is specified
-    lct_500m = (
-        lct_band
-        .reproject(crs=image.projection(), scale=500)
-        .rename('LCT')
-    )
+#     # LCT — reproject only, GEE uses nearest neighbour by default
+#     # for integer/categorical images when no resample is specified
+#     lct_500m = (
+#         lct_band
+#         .reproject(crs=image.projection(), scale=500)
+#         .rename('LCT')
+#     )
 
-    return image.addBands([dem_500m, lct_500m])
+#     return image.addBands([dem_500m, lct_500m])
 
 
-# ==============================================================================
-# FUNCTION 2 — APPLY TABLE 3 MULTI-INDEX THRESHOLDS
-# ==============================================================================
+# # ==============================================================================
+# # FUNCTION 2 — APPLY TABLE 3 MULTI-INDEX THRESHOLDS
+# # ==============================================================================
 
 def apply_multi_index_thresholds(image):
     """
